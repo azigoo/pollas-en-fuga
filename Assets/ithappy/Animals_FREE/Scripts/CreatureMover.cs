@@ -31,6 +31,12 @@ namespace ithappy.Animals_FREE
         [SerializeField]
         private bool m_EnableJumpCut = true;
 
+        [Header("Jump Assist")]
+        [SerializeField, Tooltip("Tiempo (s) después de dejar el suelo en el que aún puedes saltar.")]
+        private float m_CoyoteTime = 0.12f;
+        [SerializeField, Tooltip("Tiempo (s) que se guarda el input de salto antes de tocar el suelo.")]
+        private float m_JumpBufferTime = 0.12f;
+
         [Header("Animator")]
         [SerializeField]
         private string m_VerticalID = "Vert";
@@ -61,9 +67,12 @@ namespace ithappy.Animals_FREE
         {
             m_WalkSpeed = Mathf.Max(m_WalkSpeed, 0f);
             m_RunSpeed = Mathf.Max(m_RunSpeed, m_WalkSpeed);
+            m_CoyoteTime = Mathf.Max(0f, m_CoyoteTime);
+            m_JumpBufferTime = Mathf.Max(0f, m_JumpBufferTime);
 
             m_Movement?.SetStats(m_WalkSpeed / 3.6f, m_RunSpeed / 3.6f, m_RotateSpeed, m_JumpHeight, m_Space,
-                m_RiseGravityMultiplier, m_FallGravityMultiplier, m_JumpCutGravityAdd, m_EnableJumpCut, m_JumpButtonName);
+                m_RiseGravityMultiplier, m_FallGravityMultiplier, m_JumpCutGravityAdd, m_EnableJumpCut, m_JumpButtonName,
+                m_CoyoteTime, m_JumpBufferTime);
         }
 
         private void Awake()
@@ -73,7 +82,8 @@ namespace ithappy.Animals_FREE
             m_Animator = GetComponent<Animator>();
 
             m_Movement = new MovementHandler(m_Controller, m_Transform, m_WalkSpeed, m_RunSpeed, m_RotateSpeed, m_JumpHeight, m_Space,
-                m_RiseGravityMultiplier, m_FallGravityMultiplier, m_JumpCutGravityAdd, m_EnableJumpCut, m_JumpButtonName);
+                m_RiseGravityMultiplier, m_FallGravityMultiplier, m_JumpCutGravityAdd, m_EnableJumpCut, m_JumpButtonName,
+                m_CoyoteTime, m_JumpBufferTime);
             m_Animation = new AnimationHandler(m_Animator, m_VerticalID, m_StateID);
         }
 
@@ -157,14 +167,19 @@ namespace ithappy.Animals_FREE
             private float m_JumpCutGravityAdd;
             private bool m_EnableJumpCut;
             private string m_JumpButtonName;
+            private float m_CoyoteTime;
+            private float m_JumpBufferTime;
 
             private Space m_Space;
 
             private Vector3 m_Normal = Vector3.up;
             private Vector3 m_GravityVelocity;
+            private float m_TimeSinceGrounded;
+            private float m_TimeSinceJumpPressed;
 
             public MovementHandler(CharacterController controller, Transform transform, float walkSpeed, float runSpeed, float rotateSpeed, float jumpHeight, Space space,
-                float riseGravityMult, float fallGravityMult, float jumpCutGravityAdd, bool enableJumpCut, string jumpButtonName)
+                float riseGravityMult, float fallGravityMult, float jumpCutGravityAdd, bool enableJumpCut, string jumpButtonName,
+                float coyoteTime, float jumpBufferTime)
             {
                 m_Controller = controller;
                 m_Transform = transform;
@@ -179,12 +194,17 @@ namespace ithappy.Animals_FREE
                 m_JumpCutGravityAdd = Mathf.Max(0f, jumpCutGravityAdd);
                 m_EnableJumpCut = enableJumpCut;
                 m_JumpButtonName = string.IsNullOrEmpty(jumpButtonName) ? "Jump" : jumpButtonName;
+                m_CoyoteTime = Mathf.Max(0f, coyoteTime);
+                m_JumpBufferTime = Mathf.Max(0f, jumpBufferTime);
 
                 m_GravityVelocity = Vector3.zero;
+                m_TimeSinceGrounded = 0f;
+                m_TimeSinceJumpPressed = float.PositiveInfinity;
             }
 
             public void SetStats(float walkSpeed, float runSpeed, float rotateSpeed, float jumpHeight, Space space,
-                float riseGravityMult, float fallGravityMult, float jumpCutGravityAdd, bool enableJumpCut, string jumpButtonName)
+                float riseGravityMult, float fallGravityMult, float jumpCutGravityAdd, bool enableJumpCut, string jumpButtonName,
+                float coyoteTime, float jumpBufferTime)
             {
                 m_WalkSpeed = walkSpeed;
                 m_RunSpeed = runSpeed;
@@ -196,6 +216,8 @@ namespace ithappy.Animals_FREE
                 m_JumpCutGravityAdd = Mathf.Max(0f, jumpCutGravityAdd);
                 m_EnableJumpCut = enableJumpCut;
                 m_JumpButtonName = string.IsNullOrEmpty(jumpButtonName) ? "Jump" : jumpButtonName;
+                m_CoyoteTime = Mathf.Max(0f, coyoteTime);
+                m_JumpBufferTime = Mathf.Max(0f, jumpBufferTime);
             }
 
             public void SetSurface(in Vector3 normal)
@@ -272,6 +294,24 @@ namespace ithappy.Animals_FREE
             {
                 bool isGrounded = m_Controller.isGrounded;
 
+                if (isGrounded)
+                {
+                    m_TimeSinceGrounded = 0f;
+                }
+                else
+                {
+                    m_TimeSinceGrounded += deltaTime;
+                }
+
+                if (isJump)
+                {
+                    m_TimeSinceJumpPressed = 0f;
+                }
+                else
+                {
+                    m_TimeSinceJumpPressed += deltaTime;
+                }
+
                 if (isGrounded && m_GravityVelocity.y < 0f)
                 {
                     m_GravityVelocity.y = -2f;
@@ -288,10 +328,14 @@ namespace ithappy.Animals_FREE
                     m_GravityVelocity += Physics.gravity * mult * deltaTime;
                 }
 
-                if (isJump && isGrounded)
+                bool bufferedJump = m_TimeSinceJumpPressed <= m_JumpBufferTime;
+                bool canUseCoyote = m_TimeSinceGrounded <= m_CoyoteTime;
+
+                if (bufferedJump && (isGrounded || canUseCoyote))
                 {
                     float gRise = -Physics.gravity.y * m_RiseGravityMult;
                     m_GravityVelocity.y = Mathf.Sqrt(2f * m_JumpHeight * gRise);
+                    m_TimeSinceJumpPressed = float.PositiveInfinity;
                 }
 
                 isAir = !isGrounded;
