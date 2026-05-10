@@ -67,5 +67,5 @@
         "*.sln": "*.csproj",
         "*.slnx": "*.csproj"
     },
-    "dotnet.defaultSolution": "Pollas en fuga.slnx"
+    "dotnet.defaultSolution": "pollas-en-fuga.slnx"
 }
