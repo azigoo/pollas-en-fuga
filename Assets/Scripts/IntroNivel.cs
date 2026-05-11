@@ -51,22 +51,33 @@ public class IntroNivel : MonoBehaviour
 
     void Start()
     {
-        cgHistoria = marcoHistoria.GetComponent<CanvasGroup>();
+       
 
-        tituloText.text = textoTitulo;
-        historiaText.text = "";
-
-        barraSuperior.anchoredPosition = new Vector2(0, supFuera);
-        barraInferior.anchoredPosition = new Vector2(0, infFuera);
-
-        tituloText.alpha = 0;
-        historiaText.alpha = 1f;
-        saltarText.alpha = 1;
-        cgHistoria.alpha = 0;
-
-        Time.timeScale = 0f;
-        StartCoroutine(SecuenciaIntro());
     }
+    public void Iniciar()
+{
+    gameObject.SetActive(true);
+    cgHistoria = marcoHistoria.GetComponent<CanvasGroup>();
+
+    tituloText.text = textoTitulo;
+    historiaText.text = "";
+
+    barraSuperior.anchoredPosition = new Vector2(0, supFuera);
+    barraInferior.anchoredPosition = new Vector2(0, infFuera);
+
+    tituloText.alpha = 0;
+    historiaText.alpha = 1f;
+    saltarText.alpha = 1;
+    cgHistoria.alpha = 0;
+
+    saltando = false;
+    enFaseHistoria = false;
+    historiaEscribiendo = false;
+    historiaApuroPendiente = 0;
+
+    Time.timeScale = 0f;
+    StartCoroutine(SecuenciaIntro());
+}
 
     void Update()
     {
